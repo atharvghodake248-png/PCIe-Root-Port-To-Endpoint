@@ -1,0 +1,4 @@
+*.elf
+build/
+build_ep/
+*.docx
