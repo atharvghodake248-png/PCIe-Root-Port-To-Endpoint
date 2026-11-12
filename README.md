@@ -43,6 +43,9 @@ goal4/
     run.resc                  Demo script
 ```
 
+The Root Port application keeps `main.c` focused on orchestration; PCIe configuration,
+endpoint enumeration, interrupt tests, and result reporting are implemented in separate source files.
+
 Firmware binaries (`.elf`) are not committed. Build them as described below.
 
 ## Base platform file
