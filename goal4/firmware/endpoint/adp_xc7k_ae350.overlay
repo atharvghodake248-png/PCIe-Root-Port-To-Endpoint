@@ -26,3 +26,5 @@
 &wdt { status = "disabled"; };
 &dma0 { status = "disabled"; };
 &mbox { status = "disabled"; };
+&plic0 { compatible = "sifive,plic-1.0.0"; };
+&plic_sw { compatible = "sifive,plic-1.0.0"; };

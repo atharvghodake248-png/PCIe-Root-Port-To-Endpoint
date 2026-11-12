@@ -1,18 +1,18 @@
-include @D:/1_Project/goal4/peripherals/PcieGoal4.cs
+include @goal4/renode/peripherals/PciePeripherals.cs
 
 emulation CreatePcieConnector "pcie"
 
 # ---- machine "ep": AE350 running its own Zephyr firmware, hosts the Endpoint ----
 mach create "ep"
-machine LoadPlatformDescriptionFromString "using \"D:/1_Project/goal4/pcie_ep.repl\""
+machine LoadPlatformDescriptionFromString "using \"goal4/renode/platforms/pcie_endpoint.repl\""
 showAnalyzer sysbus.uart1
 logLevel -1 sysbus.pcieEp
 connector Connect sysbus.pcieEp pcie
-sysbus LoadELF @D:/1_Project/goal4/fw_ep/zephyr.elf
+sysbus LoadELF @build/goal4_ep/zephyr/zephyr.elf
 
 # ---- machine "rp": AE350 running the Root Port firmware ----
 mach create "rp"
-machine LoadPlatformDescriptionFromString "using \"D:/1_Project/goal4/ae350_pcie_rp.repl\""
+machine LoadPlatformDescriptionFromString "using \"goal4/renode/platforms/pcie_root_port.repl\""
 showAnalyzer sysbus.uart1
 logLevel -1 sysbus.pcieRp
 logLevel -1 sysbus.pcieBar
@@ -20,4 +20,6 @@ logLevel -1 sysbus.pcieMsi
 connector Connect sysbus.pcieRp pcie
 connector Connect sysbus.pcieBar pcie
 connector Connect sysbus.pcieMsi pcie
-sysbus LoadELF @D:/1_Project/goal4/fw/zephyr.elf
+sysbus LoadELF @build/goal4_rp/zephyr/zephyr.elf
+
+emulation RunFor "1"
