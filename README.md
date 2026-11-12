@@ -8,10 +8,10 @@ Both machines boot Zephyr RTOS. The Root Port firmware discovers the Endpoint us
 
 | Part | Where | What it is |
 |---|---|---|
-| Root Port machine `rp` | `goal4/ae350_pcie_rp.repl` | Type 1 Root Port, BAR window, MSI window, Root Port firmware |
-| Endpoint machine `ep` | `goal4/pcie_ep.repl` | Type 0 Endpoint (BAR0, capability list with MSI), Endpoint firmware |
-| `PcieConnector` | `goal4/peripherals/PcieGoal4.cs` | Native connector modeled on Renode's `GPIOConnector`. It holds direct references to both sides and forwards config, BAR, INTx and MSI traffic between the machines in-process |
-| Demo script | `goal4/run.resc` | Creates the connector, both machines, and loads both firmwares |
+| Root Port machine `rp` | `goal4/renode/platforms/pcie_root_port.repl` | Type 1 Root Port, BAR window, MSI window, Root Port firmware |
+| Endpoint machine `ep` | `goal4/renode/platforms/pcie_endpoint.repl` | Type 0 Endpoint (BAR0, capability list with MSI), Endpoint firmware |
+| PCIe peripherals and connector | `goal4/renode/peripherals/PciePeripherals.cs` | Renode models for the Root Port, Endpoint, BAR/MSI windows, and connector |
+| Demo script | `goal4/renode/run.resc` | Creates the connector, both machines, and loads both firmware images |
 
 ### Address map
 
@@ -29,20 +29,28 @@ Both machines boot Zephyr RTOS. The Root Port firmware discovers the Endpoint us
 ```
 goal3/                       Single-machine stub Root Port (raw MMIO enumeration)
 goal4/
-  ae350_pcie_rp.repl         Root Port machine platform
-  pcie_ep.repl               Endpoint machine platform
-  run.resc                   Demo script
-  peripherals/PcieGoal4.cs   Root Port, Endpoint, BAR/MSI windows, connector
-  fw_src/                    Root Port firmware (Zephyr app)
-  fw_ep_src/                 Endpoint firmware (Zephyr app)
-  reference/andes_ae350_n25.repl   Copy of the Renode base platform (see below)
+  firmware/
+    root_port/                Root Port Zephyr application
+    endpoint/                 Endpoint Zephyr application
+  renode/
+    platforms/
+      pcie_root_port.repl     Root Port machine platform
+      pcie_endpoint.repl      Endpoint machine platform
+    peripherals/
+      PciePeripherals.cs      Root Port, Endpoint, BAR/MSI windows, connector
+    reference/
+      andes_ae350_n25.repl    Reference copy of the Renode base platform
+    run.resc                  Demo script
 ```
+
+The Root Port application keeps `main.c` focused on orchestration; PCIe configuration,
+endpoint enumeration, interrupt tests, and result reporting are implemented in separate source files.
 
 Firmware binaries (`.elf`) are not committed. Build them as described below.
 
 ## Base platform file
 
-`ae350_pcie_rp.repl` and `pcie_ep.repl` start with:
+`pcie_root_port.repl` and `pcie_endpoint.repl` start with:
 
 ```
 using "platforms/cpus/andes_ae350_n25.repl"
@@ -51,7 +59,7 @@ using "platforms/cpus/andes_ae350_n25.repl"
 That file is **part of the Renode installation**, not of this repository:
 `<Renode install>/platforms/cpus/andes_ae350_n25.repl`
 (for example `D:\Renode\renode\platforms\cpus\andes_ae350_n25.repl`).
-A copy is kept in `goal4/reference/` for reading only.
+A copy is kept in `goal4/renode/reference/` for reading only.
 
 ## Requirements
 
@@ -65,31 +73,25 @@ The Zephyr workspace is assumed to be at `~/zephyrproject` and this repository a
 
 ```bash
 source ~/zephyrproject/.venv/bin/activate
+cd ~/zephyrproject
 
 # Root Port firmware
-mkdir -p ~/zephyrproject/pcie_raw
-cp -r /mnt/d/1_Project/goal4/fw_src/* ~/zephyrproject/pcie_raw/
-cd ~/zephyrproject
-west build -b adp_xc7k/ae350 pcie_raw -p always
-mkdir -p /mnt/d/1_Project/goal4/fw
-cp build/zephyr/zephyr.elf /mnt/d/1_Project/goal4/fw/
+west build -b adp_xc7k/ae350 /mnt/d/1_Project/goal4/firmware/root_port \
+  -d /mnt/d/1_Project/build/goal4_rp -p always
 
 # Endpoint firmware
-mkdir -p ~/zephyrproject/pcie_ep
-cp -r /mnt/d/1_Project/goal4/fw_ep_src/* ~/zephyrproject/pcie_ep/
-west build -b adp_xc7k/ae350 pcie_ep -d build_ep -p always
-mkdir -p /mnt/d/1_Project/goal4/fw_ep
-cp build_ep/zephyr/zephyr.elf /mnt/d/1_Project/goal4/fw_ep/
+west build -b adp_xc7k/ae350 /mnt/d/1_Project/goal4/firmware/endpoint \
+  -d /mnt/d/1_Project/build/goal4_ep -p always
 ```
 
 ## Run (Windows PowerShell)
 
-`run.resc` uses absolute paths under `D:/1_Project/goal4/`. Clone the repository to `D:\1_Project`
-or edit the paths in `run.resc`.
+The Renode script and firmware paths are relative to the repository root. Start Renode from that
+directory so the script can find `goal4/renode/` and the generated `build/` images.
 
 ```powershell
-cd D:\Renode\renode
-.\renode.exe D:\1_Project\goal4\run.resc
+Set-Location D:\1_Project
+& D:\Renode\renode\renode.exe goal4\renode\run.resc
 ```
 
 Then type `start` in the Renode monitor. Two UART windows open: `ep:sysbus.uart1` and `rp:sysbus.uart1`.

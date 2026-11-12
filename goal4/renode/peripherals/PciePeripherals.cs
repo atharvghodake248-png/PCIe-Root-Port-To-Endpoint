@@ -14,7 +14,7 @@ using Antmicro.Renode.Peripherals.PCI;
 namespace Antmicro.Renode.Connectors
 {
     // ---- what the connector needs from each side ----
-    public interface IPcieConfigTarget                      // Endpoint side
+    public interface IPcieConfigTarget                      // **Endpoint side
     {
         uint ConfigRead(int reg);
         void ConfigWrite(int reg, uint value);
@@ -23,7 +23,7 @@ namespace Antmicro.Renode.Connectors
         void SetUpstream(PcieConnector connector);
     }
  
-    public interface IPcieConnectorClient                   // Root Port machine side
+    public interface IPcieConnectorClient                   // **Root Port machine side
     {
         void SetConnector(PcieConnector connector);
         void Trace(string message);
@@ -41,7 +41,7 @@ namespace Antmicro.Renode.Connectors
         }
     }
  
-    public class PcieConnector : IExternal, IConnectable<IPeripheral>
+    public class PcieConnector : IExternal, IConnectable<IPeripheral>   // **
     {
         public void AttachTo(IPeripheral peripheral)
         {
@@ -90,7 +90,7 @@ namespace Antmicro.Renode.Connectors
         }
  
         // ---- config space: bus 1 / device 0 / function 0 is the Endpoint ----
-        public uint ConfigRead(int dev, int fn, int reg)
+        public uint ConfigRead(int dev, int fn, int reg)   // **
         {
             lock(sync)
             {
@@ -218,7 +218,7 @@ namespace Antmicro.Renode.Peripherals.PCI
     using Antmicro.Renode.Connectors;
  
     // ===================== Root Port (machine "rp") =====================
-    // Type 1 (PCI-PCI bridge) header at 00:00.0. Config accesses to the secondary bus go through the connector.
+    // **Type 1 (PCI-PCI bridge) header at 00:00.0. Config accesses to the secondary bus go through the connector.
     public class PcieRootPort : IDoubleWordPeripheral, IKnownSize, IPcieConnectorClient, IPcieBridge
     {
         public PcieRootPort(IMachine machine)
@@ -230,7 +230,7 @@ namespace Antmicro.Renode.Peripherals.PCI
         public void SetConnector(PcieConnector connector) { this.connector = connector; }
         public void Trace(string message) { this.Log(LogLevel.Debug, "{0}", message); }
  
-        public void Reset()
+        public void Reset() // **
         {
             cfg = new uint[1024];
             cfg[0x00 / 4] = 0x00011234;  // Device ID 0x0001 | Vendor ID 0x1234
@@ -260,7 +260,7 @@ namespace Antmicro.Renode.Peripherals.PCI
  
         public bool BusMasterEnabled() { return (cfg[0x04 / 4] & 0x4) != 0; }
  
-        public uint ReadDoubleWord(long offset)
+        public uint ReadDoubleWord(long offset) // **
         {
             Decode(offset, out var bus, out var dev, out var fn, out var reg);
             if(bus == 0)
@@ -330,7 +330,7 @@ namespace Antmicro.Renode.Peripherals.PCI
             return sec != 0 && bus == sec;
         }
  
-        private static void Decode(long offset, out int bus, out int dev, out int fn, out int reg)
+        private static void Decode(long offset, out int bus, out int dev, out int fn, out int reg) // **
         {
             reg = (int)(offset & 0xFFC);
             bus = (int)((offset >> 20) & 0xFF);
