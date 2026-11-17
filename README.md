@@ -4,6 +4,15 @@ A PCIe Root Port and Endpoint simulation on two emulated Andes AE350 machines in
 Both machines boot Zephyr RTOS. The Root Port firmware discovers the Endpoint using hand-written MMIO
 (no Zephyr PCIe driver API), configures its BAR, does an MMIO round trip and handles INTx and MSI interrupts.
 
+## Overall Project Architecture
+
+The following diagram illustrates the complete PCIe data flow, including enumeration,
+Endpoint configuration, BAR0 MMIO communication, interrupt handling and result reporting.
+
+![PCIe Overall Data Flow](https://drive.google.com/file/d/1hPbksuSix3PoscCihYtN1vVoj2JsU6Wz/view?usp=drive_link)
+
+[Editable draw.io diagram](https://drive.google.com/file/d/1Sw4cWKm6RQzjnvy_SK66N-u5REm98DZ7/view?usp=drive_link)
+
 ## Architecture
 
 | Part | Where | What it is |
