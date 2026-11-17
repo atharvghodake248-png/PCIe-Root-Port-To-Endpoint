@@ -9,7 +9,7 @@ Both machines boot Zephyr RTOS. The Root Port firmware discovers the Endpoint us
 The following diagram illustrates the complete PCIe data flow, including enumeration,
 Endpoint configuration, BAR0 MMIO communication, interrupt handling and result reporting.
 
-![PCIe Overall Data Flow](https://drive.google.com/file/d/1hPbksuSix3PoscCihYtN1vVoj2JsU6Wz/view?usp=sharing)
+[View PCIe Project Diagram on Google Drive](https://drive.google.com/file/d/1hPbksuSix3PoscCihYtN1vVoj2JsU6Wz/view?usp=sharing)
 
 [Editable draw.io diagram](https://drive.google.com/file/d/1Sw4cWKm6RQzjnvy_SK66N-u5REm98DZ7/view?usp=sharing)
 
