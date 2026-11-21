@@ -449,13 +449,15 @@ namespace Antmicro.Renode.Peripherals.PCI
             this.machine = machine;
             Reset();
         }
- 
+
         public void Reset()
         {
             cfg = new uint[1024];
             regs = new uint[1024];
             hostWrites = 0;
-            cfg[0x00 / 4] = 0x00021234;  // Device ID 0x0002 | Vendor ID 0x1234
+            identReady = false;
+            magic = 0xE0E0E0E0;
+            cfg[0x00 / 4] = 0x00000000;  // Device ID | Vendor ID: written by the EP firmware (IDENT register 0x20)
             cfg[0x04 / 4] = 0x00100000;  // Status: capabilities list; Command = 0
             cfg[0x08 / 4] = 0x05800001;  // Class 0x05 (memory), subclass 0x80, Rev 1
             cfg[0x0C / 4] = 0x00000000;  // Header type 0
@@ -464,19 +466,29 @@ namespace Antmicro.Renode.Peripherals.PCI
             cfg[0x40 / 4] = 0x00000005;  // Cap ID 0x05 (MSI), next = 0x00, message control = 0
             // 0x44 = MSI message address, 0x48 = MSI message data
         }
- 
+
         public void SetUpstream(PcieConnector connector) { upstream = connector; }
- 
+
         // ---- config space (called by the connector) ----
+        // Until the EP firmware has programmed its identity the device answers "not present"
+        // (like a device that is not ready yet), so the Root Port firmware retries.
         public uint ConfigRead(int reg)
         {
+            if(!identReady)
+            {
+                return 0xFFFFFFFF;
+            }
             var v = cfg[(reg & 0xFFC) / 4];
             this.Log(LogLevel.Debug, "EP CFG RD reg 0x{0:X} -> 0x{1:X8}", reg, v);
             return v;
         }
- 
+
         public void ConfigWrite(int reg, uint value)
         {
+            if(!identReady)
+            {
+                return;
+            }
             reg &= 0xFFC;
             this.Log(LogLevel.Debug, "EP CFG WR reg 0x{0:X} <- 0x{1:X8}", reg, value);
             switch(reg)
@@ -497,7 +509,7 @@ namespace Antmicro.Renode.Peripherals.PCI
                     break;
             }
         }
- 
+
         // ---- memory space (called by the connector) ----
         public uint BarRead(uint address)
         {
@@ -509,7 +521,7 @@ namespace Antmicro.Renode.Peripherals.PCI
             this.Log(LogLevel.Debug, "EP BAR RD off 0x{0:X} -> 0x{1:X8}", address & 0xFFF, v);
             return v;
         }
- 
+
         public void BarWrite(uint address, uint value)
         {
             if(!BarHit(address))
@@ -520,7 +532,7 @@ namespace Antmicro.Renode.Peripherals.PCI
             hostWrites++;
             RegWrite(address & 0xFFF, value);
         }
- 
+
         // Memory Space Enable (Command bit 1) must be on and the address must match the programmed BAR0.
         private bool BarHit(uint address)
         {
@@ -536,24 +548,27 @@ namespace Antmicro.Renode.Peripherals.PCI
             }
             return true;
         }
- 
+
         // ---- BAR0 register block ----
-        // 0x00: SCRATCH (read/write)   0x04: MAGIC (read-only, 0xE0E0E0E0)
+        // 0x00: SCRATCH (read/write)   0x04: MAGIC (read-only for the host)
         // 0x08: DOORBELL (bit 0 = 1 raises an interrupt: MSI if enabled, otherwise INTx; bit 0 = 0 clears INTx)
         // 0x0C: STATUS (read-only)  0x10: BAR0 value (read-only)  0x14: host write count (read-only)
-        // 0x0C..0x14 let the firmware running on the Endpoint machine see what the Root Port side has configured.
+        // 0x20: IDENT  (EP firmware only: [15:0] vendor, [31:16] device; first write makes the device visible)
+        // 0x24: MAGIC value (EP firmware only)
         private uint RegRead(long offset)
         {
             switch(offset & 0xFFC)
             {
-                case 0x04: return 0xE0E0E0E0;       // MAGIC
+                case 0x04: return magic;             // MAGIC
                 case 0x0C: return StatusBits();      // STATUS (what the host has configured)
                 case 0x10: return cfg[0x10 / 4];     // BAR0 value programmed by the host
                 case 0x14: return hostWrites;        // number of BAR writes made by the host
+                case 0x20: return cfg[0x00 / 4];     // IDENT
+                case 0x24: return magic;
             }
             return regs[(offset & 0xFFC) / 4];
         }
- 
+
         // bit0 BAR0 programmed, bit1 Memory Space on, bit2 Bus Master on, bit3 MSI enabled, bit4 INTx asserted
         private uint StatusBits()
         {
@@ -565,13 +580,13 @@ namespace Antmicro.Renode.Peripherals.PCI
             if((cfg[0x04 / 4] & 0x00080000u) != 0) { s |= 0x10; }
             return s;
         }
- 
+
         private void RegWrite(long offset, uint value)
         {
             var o = offset & 0xFFC;
-            if(o == 0x04 || o == 0x0C || o == 0x10 || o == 0x14)
+            if(o == 0x04 || o == 0x0C || o == 0x10 || o == 0x14 || o == 0x20 || o == 0x24)
             {
-                return;                              // read-only registers
+                return;                              // read-only registers (for the host)
             }
             regs[(offset & 0xFFC) / 4] = value;
             if(offset == 0x08)
@@ -579,7 +594,7 @@ namespace Antmicro.Renode.Peripherals.PCI
                 Doorbell((value & 1) != 0);
             }
         }
- 
+
         private void Doorbell(bool ring)
         {
             if(!ring)
@@ -607,7 +622,7 @@ namespace Antmicro.Renode.Peripherals.PCI
                 SetIntx(true);
             }
         }
- 
+
         // Legacy INTx: Status bit 3 (Interrupt Status) mirrors the interrupt line.
         private void SetIntx(bool level)
         {
@@ -625,17 +640,36 @@ namespace Antmicro.Renode.Peripherals.PCI
                 upstream.RaiseInterrupt(level);
             }
         }
- 
-        // Direct access on the ep machine's own bus (for debugging from the Renode monitor).
+
+        // Access on the ep machine's own bus: this is what the EP firmware uses.
         public uint ReadDoubleWord(long offset) { return RegRead(offset); }
-        public void WriteDoubleWord(long offset, uint value) { RegWrite(offset, value); }
- 
+
+        public void WriteDoubleWord(long offset, uint value)
+        {
+            var o = offset & 0xFFC;
+            if(o == 0x20)
+            {
+                cfg[0x00 / 4] = value;
+                identReady = true;
+                this.Log(LogLevel.Debug, "EP firmware set IDENT: vendor=0x{0:X4} device=0x{1:X4}", value & 0xFFFF, value >> 16);
+                return;
+            }
+            if(o == 0x24)
+            {
+                magic = value;
+                return;
+            }
+            RegWrite(offset, value);
+        }
+
         public long Size => 0x1000;
- 
+
         private uint[] cfg;
         private uint[] regs;
         private PcieConnector upstream;
         private uint hostWrites;
+        private uint magic;
+        private bool identReady;
         private readonly IMachine machine;
     }
 }
