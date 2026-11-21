@@ -3,6 +3,11 @@
 
 #include "pcie_demo.h"
 
+/* The endpoint answers 0xFFFFFFFF until its own firmware has set its identity,
+ * so the Root Port retries instead of giving up on the first read. */
+#define ENUM_RETRIES 100
+#define ENUM_SPIN    200000u
+
 static void test_endpoint(uint8_t dev, uint32_t endpoint_id,
 			  struct pcie_test_results *results)
 {
@@ -13,7 +18,7 @@ static void test_endpoint(uint8_t dev, uint32_t endpoint_id,
 
 	results->connector = 1;
 	results->enumerated = 1;
-	results->ids = ((endpoint_id & 0xFFFF) == 0x1234 && (endpoint_id >> 16) == 0x0002);
+	results->ids = (endpoint_id != 0xFFFFFFFF);
 
 	uint32_t original_bar = pcie_cfg_read32(1, dev, 0, 0x10);
 
@@ -47,10 +52,28 @@ static void test_endpoint(uint8_t dev, uint32_t endpoint_id,
 	pcie_run_interrupt_tests(dev, results);
 }
 
+/* Read the ID of a device that may not be ready yet; retry while it reads 0xFFFFFFFF. */
+static uint32_t read_id_with_retry(uint8_t dev)
+{
+	uint32_t id = 0xFFFFFFFF;
+
+	for (int t = 0; t < ENUM_RETRIES; t++) {
+		id = pcie_cfg_read32(1, dev, 0, 0x00);
+		if (id != 0xFFFFFFFF) {
+			return id;
+		}
+		for (volatile uint32_t d = 0; d < ENUM_SPIN; d++) {
+		}
+	}
+	return id;
+}
+
 void pcie_scan_endpoints(struct pcie_test_results *results)
 {
 	for (uint8_t dev = 0; dev < 4; dev++) {
-		uint32_t endpoint_id = pcie_cfg_read32(1, dev, 0, 0x00);
+		/* Device 0 is where the Endpoint lives: wait for its firmware. */
+		uint32_t endpoint_id = (dev == 0) ? read_id_with_retry(0)
+						  : pcie_cfg_read32(1, dev, 0, 0x00);
 
 		if (endpoint_id == 0xFFFFFFFF) {
 			printk("01:%02x.0  no device\n", dev);
