@@ -5,8 +5,8 @@
 #define EP_BASE      0xA0000000UL
 
 /* ---- Endpoint identity: change these to verify (only this file) ---- */
-#define EP_VENDOR    0x1234
-#define EP_DEVICE    0x0002
+#define EP_VENDOR    0xACBD
+#define EP_DEVICE    0x0005
 #define EP_MAGIC     0xE0E0E0E0
 #define EP_SCRATCH_INIT 0x12345678
 
