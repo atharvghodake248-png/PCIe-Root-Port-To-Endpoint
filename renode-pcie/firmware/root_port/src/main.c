@@ -13,6 +13,6 @@ int main(void)
 	}
 
 	pcie_scan_endpoints(&results);
-	pcie_print_summary(&results);
+	// pcie_print_summary(&results);
 	return 0;
 }
