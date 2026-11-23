@@ -1,10 +1,10 @@
-include @renode-pcie/renode/peripherals/PciePeripherals.cs
+include @renode-pcie/renode_files/peripherals/PciePeripherals.cs
 
 emulation CreatePcieConnector "pcie"
 
 # ---- machine "ep": AE350 running its own Zephyr firmware, hosts the Endpoint ----
 mach create "ep"
-machine LoadPlatformDescriptionFromString "using \"renode-pcie/renode/platforms/pcie_endpoint.repl\""
+machine LoadPlatformDescriptionFromString "using \"renode-pcie/renode_files/platforms/pcie_endpoint.repl\""
 showAnalyzer sysbus.uart1
 logLevel -1 sysbus.pcieEp
 connector Connect sysbus.pcieEp pcie
@@ -12,7 +12,7 @@ sysbus LoadELF @build/goal4_ep/zephyr/zephyr.elf
 
 # ---- machine "rp": AE350 running the Root Port firmware ----
 mach create "rp"
-machine LoadPlatformDescriptionFromString "using \"renode-pcie/renode/platforms/pcie_root_port.repl\""
+machine LoadPlatformDescriptionFromString "using \"renode-pcie/renode_files/platforms/pcie_root_port.repl\""
 showAnalyzer sysbus.uart1
 logLevel -1 sysbus.pcieRp
 logLevel -1 sysbus.pcieBar
