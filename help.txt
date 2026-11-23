@@ -1,0 +1,5 @@
+
+west build -b adp_xc7k/ae350 .\renode-pcie\firmware\root_port -d .\build\goal4_rp -p always
+
+ 
+renode .\renode-pcie\renode_files\run.resc
